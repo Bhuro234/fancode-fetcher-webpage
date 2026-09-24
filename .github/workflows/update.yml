@@ -1,1 +1,33 @@
+name: Auto-Update Stream Playlist
 
+# This tells GitHub to run the script every 30 minutes, and also adds a button to run it manually.
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  fetch-and-update:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Step 1: Check out your repository
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # Step 2: Download the playlist (Replace the URL with whatever public source you are mirroring)
+      - name: Fetch Latest Playlist
+        run: |
+          curl -s "https://raw.githubusercontent.com/drmlive/fancode-live-events/main/fancode.m3u" -o my-playlist.m3u
+          
+      # Step 3: Commit and push the new file back to your repo
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "GitHub Action Bot"
+          git config --global user.email "action@github.com"
+          git add my-playlist.m3u
+          
+          # This line prevents the script from failing if the playlist hasn't changed
+          git commit -m "Auto-updated playlist" || echo "No changes to commit"
+          
+          git push
