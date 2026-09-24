@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FanCode Player</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #e10600; 
+            background-image: 
+                linear-gradient(to bottom, #f8f4e6 0%, rgba(248, 244, 230, 0.95) 20%, rgba(248, 244, 230, 0) 50%),
+                url('bg.jpg');
+            background-size: 100vw 100vh, cover;
+            background-repeat: no-repeat, no-repeat;
+            /* Anchors the bottom of the image perfectly to the bottom of the screen */
+            background-position: top center, center bottom; 
+            background-attachment: fixed, fixed;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 2rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Style the dropdown options so they are readable */
+        select option { background-color: #1e293b; color: white; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 10px; }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 flex flex-col text-white">
+
+    <!-- Top Header: Logo and Title -->
+    <header class="w-full flex justify-center items-center gap-4 mb-6 md:mb-10 mt-2">
+        <div class="w-14 h-14 bg-black/5 backdrop-blur-md rounded-2xl border border-black/10 flex items-center justify-center shadow-sm p-2">
+            <img src="https://www.google.com/s2/favicons?domain=fancode.com&sz=128" alt="FanCode Logo" class="w-full h-full object-contain rounded-lg shadow-sm">
+        </div>
+        <h1 class="text-4xl md:text-5xl font-extrabold text-[#e50020] drop-shadow-sm tracking-tighter">FanCode</h1>
+    </header>
+
+    <!-- Main Content Layout (Moved up slightly to reveal the car at the bottom) -->
+    <main class="flex-1 flex flex-col justify-start pt-4 md:pt-8 items-center w-full max-w-6xl mx-auto pb-40">
+        
+        <!-- Big Cinematic Video Player -->
+        <div class="w-full flex flex-col glass-panel p-4 md:p-6 shadow-2xl">
+            
+            <!-- Player Top Bar (Dropdown Only) -->
+            <div class="mb-4 px-2 flex justify-center items-center">
+                <select id="channel-select" onchange="playSelectedStream()" class="bg-black/20 hover:bg-black/30 transition-colors text-white border border-white/20 rounded-xl px-4 py-2 font-bold backdrop-blur-md outline-none cursor-pointer w-full shadow-sm text-center">
+                    <option value="">Loading streams...</option>
+                </select>
+            </div>
+            
+            <!-- Video Element (Forced 16:9 Aspect Ratio) -->
+            <div class="w-full aspect-video bg-black/60 backdrop-blur-xl rounded-[1.5rem] overflow-hidden shadow-2xl relative flex items-center justify-center border border-white/10">
+                <video id="video-player" controls autoplay class="w-full h-full outline-none object-contain"></video>
+            </div>
+        </div>
+        
+    </main>
+
+    <script>
+        let hls = null;
+        const video = document.getElementById('video-player');
+        const channelSelect = document.getElementById('channel-select');
+        let channelsData = [];
+
+        fetch('./fancode.m3u')
+            .then(response => {
+                if (!response.ok) throw new Error("Playlist not found.");
+                return response.text();
+            })
+            .then(data => parseM3U(data))
+            .catch(err => {
+                channelSelect.innerHTML = `<option value="">Could not load playlist</option>`;
+            });
+
+        function parseM3U(text) {
+            const lines = text.split('\n');
+            let currentName = 'Unknown Channel';
+            channelsData = [];
+
+            for (let line of lines) {
+                line = line.trim();
+                if (line.startsWith('#EXTINF')) {
+                    const nameSplit = line.split(',');
+                    if (nameSplit.length > 1) currentName = nameSplit[nameSplit.length - 1].trim();
+                } 
+                else if (line.startsWith('http')) {
+                    channelsData.push({ name: currentName.replace(/'/g, "\\'"), url: line });
+                    currentName = 'Unknown Channel';
+                }
+            }
+
+            if (channelsData.length > 0) {
+                channelSelect.innerHTML = channelsData.map((ch, idx) => 
+                    `<option value="${idx}">▶ ${ch.name}</option>`
+                ).join('');
+                
+                playStream(channelsData[0].url);
+            } else {
+                channelSelect.innerHTML = '<option value="">No streams available</option>';
+            }
+        }
+
+        function playSelectedStream() {
+            const selectedIdx = channelSelect.value;
+            if(selectedIdx !== "") {
+                playStream(channelsData[selectedIdx].url);
+            }
+        }
+
+        function playStream(url) {
+            if (hls) hls.destroy();
+
+            if (Hls.isSupported()) {
+                hls = new Hls({ maxLiveSyncPlaybackRate: 1.5 });
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = url;
+                video.play();
+            }
+        }
+    </script>
+</body>
+</html>
