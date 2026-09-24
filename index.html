@@ -76,6 +76,7 @@
         const channelSelect = document.getElementById('channel-select');
         let channelsData = [];
 
+        // Fetches your local auto-updating playlist
         fetch('./fancode.m3u')
             .then(response => {
                 if (!response.ok) throw new Error("Playlist not found.");
@@ -121,16 +122,22 @@
             }
         }
 
+        // Your specific Cloudflare Worker URL
+        const CLOUDFLARE_PROXY = "https://fancodeplay.somyabhalani.workers.dev/?url=";
+
         function playStream(url) {
+            // Route the video URL through your Cloudflare proxy
+            const proxiedUrl = CLOUDFLARE_PROXY + encodeURIComponent(url);
+
             if (hls) hls.destroy();
 
             if (Hls.isSupported()) {
                 hls = new Hls({ maxLiveSyncPlaybackRate: 1.5 });
-                hls.loadSource(url);
+                hls.loadSource(proxiedUrl);
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = url;
+                video.src = proxiedUrl;
                 video.play();
             }
         }
